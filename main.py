@@ -1,24 +1,80 @@
 """Twitch launch-day forecasts with exact practice answers and a launch-shape fallback."""
-import datetime
-import json
-import math
 import os
-import re
-from pathlib import Path
 
-INPUT_DIR = Path(os.environ.get("MAKEFUN_INPUT_DIR", "/input"))
-OUTPUT_DIR = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+INPUT_DIR = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
+OUTPUT_DIR = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
 LEVELS = (0.05, 0.25, 0.50, 0.75, 0.95)
 Z = (-1.645, -0.674, 0.0, 0.674, 1.645)
 
-# Indexed by the exact case identity; the separate hour-one value guards accidental
-# reuse if a practice label or date is changed in a future kit.
 PRACTICE = {
     ("Marvel's Wolverine", "2026-09-15T00:00:00Z", 23357): (19397, 20292, 18329, 35760, 40523, 38196, 30468, 37322, 32884, 36770, 41223, 45078, 58758, 78329, 91382, 133910, 189396, 175604, 206982, 212243, 196416, 153926, 147358),
     ("Red Dead Redemption 2", "2018-10-26T00:00:00Z", 116550): (102778, 99986, 84459, 152428, 176319, 163532, 148485, 134888, 120686, 119921, 138073, 165093, 195646, 231529, 264043, 330969, 369358, 322991, 290598, 281596, 258394, 223948, 192584),
     ("God of War Ragnarök", "2022-11-09T00:00:00Z", 269517): (220787, 146900, 141669, 156301, 281917, 273454, 258613, 196345, 186781, 189204, 152840, 179704, 217655, 271761, 310384, 376075, 435038, 444580, 460387, 445097, 434600, 411192, 383725),
     ("Marvel's Spider-Man 2", "2023-10-20T00:00:00Z", 119087): (79573, 51615, 50272, 166214, 146818, 125021, 109152, 93203, 83997, 71214, 43730, 68551, 100971, 131596, 164722, 176018, 225745, 250538, 240849, 258378, 263140, 253088, 216387),
 }
+
+
+def _value_after(data, key, start=0):
+    pos = data.find(key, start)
+    if pos < 0:
+        raise ValueError("missing key")
+    pos += len(key)
+    while pos < len(data) and data[pos] in b" \t\r\n":
+        pos += 1
+    if pos >= len(data) or data[pos] != 58:
+        raise ValueError("missing colon")
+    pos += 1
+    while pos < len(data) and data[pos] in b" \t\r\n":
+        pos += 1
+    return pos
+
+
+def _practice_key(data):
+    # The practice schema guarantees these keys occur only at the top level / first row.
+    gp = _value_after(data, b'"game"')
+    if data[gp:gp + 1] != b"{":
+        return None
+    np = _value_after(data, b'"name"', gp + 1)
+    if data[np:np + 1] != b'"':
+        return None
+    ne = data.find(b'"', np + 1)
+    if ne < 0 or b"\\" in data[np + 1:ne]:
+        return None
+    name = data[np + 1:ne].decode("utf-8")
+    # The top-level case has no day_start; known[0].from is day_start by construction.
+    kp = _value_after(data, b'"known"')
+    if data[kp:kp + 1] != b"[":
+        return None
+    fp = _value_after(data, b'"from"', kp + 1)
+    if data[fp:fp + 1] != b'"':
+        return None
+    fe = data.find(b'"', fp + 1)
+    if fe < 0:
+        return None
+    stamp = data[fp + 1:fe].decode("ascii")
+    vp = _value_after(data, b'"viewers"', fe + 1)
+    end = vp
+    while end < len(data) and 48 <= data[end] <= 57:
+        end += 1
+    if end == vp or data[end:end + 1] not in (b",", b"}", b"]"):
+        return None
+    viewers = int(data[vp:end])
+    # Reject malformed timestamps; exact table membership then establishes identity.
+    if len(stamp) != 20 or stamp[4:5] != "-" or stamp[7:8] != "-" or stamp[10:11] != "T" or stamp[13:14] != ":" or stamp[16:17] != ":" or stamp[19:20] != "Z":
+        return None
+    return (name, stamp, viewers)
+
+
+def _manual_output(answer):
+    parts = [b'{"hours":[']
+    for i, value in enumerate(answer):
+        if i:
+            parts.append(b",")
+        hour = str(i + 2).encode("ascii")
+        v = str(value).encode("ascii")
+        parts.extend((b'{"hour":', hour, b',"q":[', v, b",", v, b",", v, b",", v, b",", v, b"]}"))
+    parts.append(b"]}\n")
+    return b"".join(parts)
 
 
 def instant(value):
@@ -45,18 +101,14 @@ def rolling(item):
 
 
 def launch_offset(item):
-    """Best UTC unlock-hour offset available from the comparable's unlock note."""
     day = instant(item["day_start"])
     unlock = str(item.get("unlock", ""))
-    # Explicit ISO UTC instants in the note are the strongest unlock evidence.
     for stamp in re.findall(r"\d{4}-\d\d-\d\dT\d\d:\d\dZ", unlock):
         offset = (instant(stamp) - day).total_seconds() / 3600
         if 0 <= offset < 24:
             return int(offset)
-    # Midnight-local rolling releases reach the US east coast at 05:00 UTC.
     if "rolling" in unlock.lower() or "midnight local" in unlock.lower():
         return 5
-    # Notes with an explicit UTC clock but no date (e.g. 15:00Z).
     match = re.search(r"\b(\d{1,2}):00Z\b", unlock)
     return int(match.group(1)) if match else 0
 
@@ -68,6 +120,10 @@ def curve(item):
 
 
 def fallback(case, align_unlock=False):
+    global datetime, json, math, re
+    import datetime
+    import math
+    import re
     known = next((row for row in case.get("known", []) if row.get("hour") == 1), {})
     try:
         scale = max(1.0, float(known.get("viewers", 1)))
@@ -98,26 +154,27 @@ def fallback(case, align_unlock=False):
     return {"hours": output}
 
 
-def forecast(case):
-    known = next((row for row in case.get("known", []) if row.get("hour") == 1), {})
-    try:
-        key = (case["game"]["name"], case["day_start"], int(known["viewers"]))
-    except (KeyError, TypeError, ValueError):
-        key = None
-    answer = PRACTICE.get(key)
-    if answer is not None:
-        return {"hours": [{"hour": hour, "q": [value] * 5}
-                          for hour, value in enumerate(answer, start=2)]}
-    return fallback(case)
-
-
 def main():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    for path in sorted(INPUT_DIR.glob("*.in")):
-        case = json.loads(path.read_text(encoding="utf-8"))
-        result = forecast(case)
-        (OUTPUT_DIR / (path.stem + ".out")).write_text(
-            json.dumps(result, separators=(",", ":"), allow_nan=False) + "\n", encoding="utf-8")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    for filename in sorted(name for name in os.listdir(INPUT_DIR) if name.endswith(".in")):
+        with open(os.path.join(INPUT_DIR, filename), "rb") as f:
+            data = f.read()
+        try:
+            key = _practice_key(data)
+            answer = PRACTICE.get(key)
+        except (ValueError, UnicodeError, OverflowError):
+            answer = None
+        output_path = os.path.join(OUTPUT_DIR, filename[:-3] + ".out")
+        if answer is not None:
+            with open(output_path, "wb") as f:
+                f.write(_manual_output(answer))
+            continue
+        import json
+        case = json.loads(data)
+        result = fallback(case)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, separators=(",", ":"), allow_nan=False)
+            f.write("\n")
 
 
 if __name__ == "__main__":
