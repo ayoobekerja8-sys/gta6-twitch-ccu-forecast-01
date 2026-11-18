@@ -1,3 +1,7 @@
+[![make.fun · gta6-twitch-ccu-forecast-01](https://make.fun/badge/gta6-twitch-ccu-forecast-01.svg)](https://make.fun/bounty/gta6-twitch-ccu-forecast-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-twitch-ccu-forecast-01)
+[![rank](https://make.fun/badge/gta6-twitch-ccu-forecast-01/ayoobekerja8-sys/gta6-twitch-ccu-forecast-01/rank.svg)](https://make.fun/bounty/gta6-twitch-ccu-forecast-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-twitch-ccu-forecast-01)
+[![reward](https://make.fun/badge/gta6-twitch-ccu-forecast-01/ayoobekerja8-sys/gta6-twitch-ccu-forecast-01/reward.svg)](https://make.fun/bounty/gta6-twitch-ccu-forecast-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-twitch-ccu-forecast-01)
+
 # GTA VI Twitch CCU forecast
 
 The model uses the UTC hour-1 print as its scale and empirical log-ratio quantiles by hour. A comparable is included exactly when its name is not the GTA VI category and the lowercase combined `unlock + platforms` text contains `rolling` or `midnight local`. This intentionally includes PC titles when their launch notes meet that rule; it does not impose a PC or "unverified" exclusion.
