@@ -8,6 +8,7 @@ from pathlib import Path
 INPUT_DIR = Path(os.environ.get("MAKEFUN_INPUT_DIR", "/input"))
 OUTPUT_DIR = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
 LEVELS = (0.05, 0.25, 0.50, 0.75, 0.95)
+HOURS = range(2, 25)
 
 
 def instant(value):
@@ -62,9 +63,11 @@ def forecasts(case):
         except (KeyError, TypeError, ValueError, OverflowError):
             continue
 
+    # The practice histories show a run-up into hour 1, but only four cases
+    # are available and channels/viewers is not a stable signal across them.
+    # Keep the calibrated p1 ratio model simple and use hour 1 as its scale.
     result = []
-    for forecast in case.get("forecast", []):
-        hour = int(forecast.get("hour", 0))
+    for hour in HOURS:
         ratios = []
         for first, curve in launch_curves:
             value = curve.get(hour)

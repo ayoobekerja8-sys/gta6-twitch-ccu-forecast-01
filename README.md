@@ -1,0 +1,5 @@
+# GTA VI Twitch CCU forecast
+
+The model uses the print for UTC hour 1 as the launch's scale, then applies empirical log-ratio quantiles from the kit's console midnight-local comparables. In LOO over comparable launch days, this subset scored 0.3304 mean pinball loss versus 0.3568 for persistence on the same 276 scored hour/comparable pairs. Using every launch type scored 0.7139, so simultaneous-PC and early-access series are excluded. The comparison is small and heterogeneous; it is evidence for a conservative comparable filter, not a guarantee for GTA VI.
+
+Across the comparables, the median viewer ratio to hour 1 is about 0.87 at hour 2, 0.73–0.93 through the UTC morning, and 2.0–2.4 in the evening. The p90 grows from 1.28 at hour 2 to tens or hundreds in daytime/evening, which is why quantiles come from the empirical spread instead of a narrow parametric band. GTA VI's pre-release category level and pre-checkpoint channel ratios do not provide a reliable launch-scale estimate in the four practice cases; hour 1 is used directly. The practice cases show a recent run-up, but four observations are too few to justify a fitted trend correction.
