@@ -1,4 +1,4 @@
-"""GTA VI Twitch launch forecast, using console midnight-local comparables."""
+"""GTA VI Twitch launch forecast, using rolling/midnight-local comparables."""
 import datetime
 import json
 import math
@@ -29,14 +29,11 @@ def quantile(values, level):
     return values[lower] + (values[upper] - values[lower]) * (position - lower)
 
 
-def is_console_rolling(item):
-    unlock = str(item.get("unlock", "")).lower()
-    platforms = str(item.get("platforms", "")).lower()
+def is_rolling_comparable(item):
+    text = (str(item.get("unlock", "")) + " " + str(item.get("platforms", ""))).lower()
     return (
         "grand theft auto vi category" not in str(item.get("name", "")).lower()
-        and "pc" not in platforms
-        and "unverified" not in unlock
-        and ("rolling" in unlock or "midnight local" in unlock)
+        and ("rolling" in text or "midnight local" in text)
     )
 
 
@@ -52,7 +49,7 @@ def forecasts(case):
 
     launch_curves = []
     for item in case.get("comparables") or []:
-        if not is_console_rolling(item):
+        if not is_rolling_comparable(item):
             continue
         try:
             day = instant(item["day_start"])
